@@ -97,7 +97,7 @@ class MM1KQueues:
         for i in range(0, max_queue_capacity):
             res += p_table.get(i) * taylor_sum_table.get(i)
         p = coeff * res
-        print(f"k: {max_queue_capacity}, λ: {λ}, μ: {μ}, t: {t}, p_w(t): {p}")
+        #print(f"k: {max_queue_capacity}, λ: {λ}, μ: {μ}, t: {t}, p_w(t): {p}")
         return p
 
     def __init__(self):
@@ -107,10 +107,27 @@ class MM1KQueues:
         #self.taylor_sum_table = PartialExpTaylorSumTable(μ * t, k)
 
 
-queues = MM1KQueues()
+import pickle
+
+
+def save_class(queue):
+    with open("queue_state.pkl", "wb") as f:
+        pickle.dump(queue, f)
+
+
+def load_class():
+    try:
+        with open("queue_state.pkl", "rb") as f:
+            loaded_queue = pickle.load(f)
+            return loaded_queue
+    except:
+        return MM1KQueues()
+
+
+queues = load_class()  #MM1KQueues()
 
 timeout = mp.mpf(200)
-k_values = [5000, 10000, 20000, 40000, 80000]
+k_values = [5000, 10000, 20000, 30000, 40000, 80000]
 mu_values = [50, 100, 150, 200]
 lambda_values = [(i * 10 + 1) for i in range(21)]
 probabilities = {μ: {k: [] for k in k_values} for μ in mu_values}
@@ -119,43 +136,91 @@ for μ in mu_values:
         for λ in lambda_values:
             prob = queues.p_w(k=k, λ=mp.mpf(λ), μ=mp.mpf(μ), t=timeout)
             probabilities[μ][k].append(prob)
-
+save_class(queues)
 import matplotlib.pyplot as plt
 
 rows, cols = 2, 2
-assert rows + cols == len(mu_values)
+assert rows * cols == len(mu_values)
 fig, axes = plt.subplots(rows, cols,
                          figsize=(12, 12))  # One row, multiple columns
 
+#from scipy.interpolate import interp1d
+
 line_styles = ['-', '--', '-.', ':', (0, (3, 1, 1, 1))]
 markers = ['o', 's', 'D', '^', 'v']
+#markers = ['']
 axes = axes.flatten()
+#import numpy as np
+
+#lambda_smooth = np.linspace(min(lambda_values), max(lambda_values),
+#                            300)  # 300 points for smoothness
 for i, μ in enumerate(mu_values):  # Assign each plot to an axis
     ax = axes[i]
     for j, k in enumerate(k_values):
+        #f_interp = interp1d(lambda_values, probabilities[μ][k], kind='cubic')
+        #smooth_prob = f_interp(lambda_smooth)
         ax.plot(lambda_values,
                 probabilities[μ][k],
                 marker=markers[j % len(markers)],
                 linestyle=line_styles[j % len(line_styles)],
-                alpha=0.5,
+                alpha=0.7,
                 label=f'K={k}')
+        #ax.plot(lambda_smooth,
+        #        smooth_prob,
+        #        marker=markers[j % len(markers)],
+        #        linestyle=line_styles[j % len(line_styles)],
+        #        alpha=0.5,
+        #        label=f'K={k}')
 
     # Formatting for each subplot
     ax.set_xlabel("λ (Arrival Rate)")
-    ax.set_ylabel("Probability")
+    ax.set_ylabel("Timeout Probability")
     ax.set_title(f"μ = {μ}")
     ax.legend()
     ax.grid(True)
     #ax.set_yscale("log")
 
-fig.suptitle(
-    "Probability that a signature request times out by serving rate μ.",
-    fontsize=16,
-    fontweight="bold")
+fig.suptitle("Timeout Probability for serving rate μ by arrival rate λ",
+             fontsize=16,
+             fontweight="bold")
 # Adjust layout
 plt.tight_layout()
 plt.savefig("all_plots.png")  # Save all plots in a single image
+# Second plot: One subplot per K value, different curves for μ values
+rows, cols = 2, 3
+assert rows * cols == len(k_values)
+fig, axes = plt.subplots(rows, cols, figsize=(18, 12))
+axes = axes.flatten()
 
+for i, k in enumerate(k_values):
+    ax = axes[i]
+    for j, μ in enumerate(mu_values):
+        #f_interp = interp1d(lambda_values, probabilities[μ][k], kind='cubic')
+        #smooth_prob = f_interp(lambda_smooth)
+        ax.plot(lambda_values,
+                probabilities[μ][k],
+                marker=markers[j % len(markers)],
+                linestyle=line_styles[j % len(line_styles)],
+                alpha=0.7,
+                label=f'μ={μ}')
+        #ax.plot(lambda_smooth,
+        #        smooth_prob,
+        #        marker=markers[j % len(markers)],
+        #        linestyle=line_styles[j % len(line_styles)],
+        #        alpha=0.5,
+        #        label=f'μ={μ}')
+
+    ax.set_xlabel("λ (Arrival Rate)")
+    ax.set_ylabel("Timeout Probability")
+    ax.set_title(f"K = {k}")
+    ax.legend()
+    ax.grid(True)
+
+fig.suptitle("Timeout Probability for queue size K by arrival rate λ",
+             fontsize=16,
+             fontweight="bold")
+plt.tight_layout()
+plt.savefig("all_plots_K.png")
 #plt.show()
 #for μ in mu_values:
 #    plt.figure(figsize=(8, 6))  # Create a new figure for each μ
